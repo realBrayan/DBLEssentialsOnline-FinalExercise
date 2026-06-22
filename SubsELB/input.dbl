@@ -15,8 +15,10 @@ subroutine input
     required out mismatch   Field        ,n  ;Field to return the input into
     optional in             IsRequired   ,n  ;Null entry is not allowed
     optional in             NegativeOK   ,n  ;Allow negative numbers in numerics
-    optional in             IsDateField  ,n  Do date validation & display
+    optional in             IsDateField  ,n  ;Do date validation & display
     endparams
+
+    .include "WND:windows.def"
 
     record
         len         ,i4     ;Length of valid entry

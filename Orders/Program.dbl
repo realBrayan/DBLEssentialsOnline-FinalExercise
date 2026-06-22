@@ -31,11 +31,22 @@ main Orders
 		max             ,i4,3       ;Maximum detail records currently supported
 	endrecord
 
-porc
+	record
+		a_od_qty		,a10		;Temporary alpha variable used for formatting quantity when printing
+		a_od_unit_price	,a10		;Temporary variable used for formatting when printing
+	endrecord
 
-	xcall startup
-	xcall process
-	xcall shutdown
+	record f_oh_date				;Record used for formattting the date when printing
+		year			,a4
+		month			,a2
+		day				,a2
+	endrecord
+
+proc
+
+	call startup
+	call process
+	call shutdown
 
 	stop
 
@@ -166,7 +177,7 @@ Order_header,
 		else
 		begin
 			xcall input(header_id,4,20,oh_customer,1)
-			xcall input(header_id,5,20,oh_date,,,1)
+			xcall input(header_id,5,20,oh_date,1,0,1)
 			xcall input(header_id,6,20,oh_contact,1)
 			xcall input(header_id,7,20,oh_salesrep,1)
 
@@ -208,12 +219,16 @@ Order_detail,
 
 	xcall display_text(detail_id,2,2,"  Part code:")
 	xcall display_text(detail_id,4,2,"   Quantity:")
-	xcall display_text(detail_id,5,2,"      Price:")
+	xcall display_text(detail_id,5,2,"      Price: $")
 
 	repeat
 	begin
 
 		incr count
+		
+		if count > max
+			call Extend_dynamic_memory
+
 		xcall s_bld(temp,,"Order Detail (Entering item %d of %d)",count,max)
 		xcall w_brdr(detail_id,WB_TITLE,%atrim(temp))
 
@@ -225,12 +240,16 @@ Order_detail,
 		end
 
 		xcall input(detail_id,4,15,^m(strDetail[count].od_qty,m_handle),1)
-		xcall input(detail_id,5,15,^m(strDetail[count].od_unitprice,m_handle),1)
+		xcall input(detail_id,5,16,^m(strDetail[count].od_unit_price,m_handle),1,0,0)
 
 		^m(strDetail[count].od_number,m_handle)=oh_number
 		^m(strDetail[count].od_item,m_handle)=count
+		
+		
+		
 
-		xcall clear_box(detail_id,2,15,5,60)
+		xcall clear_box(detail_id,2,15,4,60)	;Clear the inputs
+		xcall CLEAR_BOX(detail_id,5,16,5,60)	;but save the "$" on unit price input
 	end
 
 	xcall delete_window(detail_id)
@@ -258,7 +277,7 @@ View_order,
 	xcall display_text(header_id,4,2,"Customer account:")
 	xcall display_text(header_id,5,2,"      Order date:")
 	xcall display_text(header_id,6,2,"       Placed by:")
-	xcall display_text(heeder_id,7,2,"       Sales rep:")
+	xcall display_text(header_id,7,2,"       Sales rep:")
 
 	repeat
 	begin
@@ -268,14 +287,17 @@ View_order,
 		if oh_number.eq.0
 			exitloop
 
-		if (%file_access(FileOp.ReadNext,hchan,header,oh_number).ne.FileResult.OK) then
+		if (%file_access(FileOp.Read,hchan,header,oh_number).ne.FileResult.OK) then
 			xcall display_message("Order not found!")
 		else
 		begin
 			data keyPressed, a1
 
 			xcall display_text(header_id,4,20,oh_customer)
-			xcall display_text(header_id,5,20,^a(oh_date))
+
+			f_oh_date = ^a(oh_date)
+			xcall display_text(header_id,5,20, f_oh_date.month + "/" + f_oh_date.day + "/" + f_oh_date.year)
+			
 			xcall display_text(header_id,6,20,oh_contact)
 			xcall display_text(header_id,7,20,^a(oh_salesrep))
 
@@ -284,7 +306,7 @@ View_order,
 
 			call view_order_detail
 
-			xcall clear_box(header_id,4,20,9,60)
+			xcall clear_box(header_id,4,20,8,60)
 
 		end
 	end
@@ -322,8 +344,12 @@ View_order_detail,
 					xcall w_brdr(detail_id,WB_TITLE,%atrim(temp))
 
 					xcall display_text(detail_id,2,15,^m(strDetail[1].od_part,m_handle))
-					xcall display_text(detail_id,4,15,^a(^m(strDetail[1].od_qty,m_handle)))
-					xcall display_text(detail_id,5,15,^a(^m(strDetail[1].od_unit_price,m_handle)))
+
+					a_od_qty = ^m(strDetail[1].od_qty, m_handle), "ZZZZZZZZZZ" [LEFT]
+					xcall display_text(detail_id,4,15,a_od_qty)
+					
+					a_od_unit_price = ^m(strDetail.od_unit_price, m_handle), "$$$$$$$.$$" [LEFT]
+					xcall display_text(detail_id,5,15,a_od_unit_price)
 
 					xcall display_text(detail_id,9,2,"Press RETURN for the next item: ")
 					xcall wait_key(detail_id,9,34,keyPressed)
